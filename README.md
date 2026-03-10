@@ -148,6 +148,7 @@ job_search/
 ├── start_scheduler.sh         # Start macOS daily schedule
 ├── stop_scheduler.sh          # Stop macOS daily schedule
 ├── backup_job_search.sh       # Create versioned backups
+├── Job_Scraper_User_Guide.docx # Detailed user guide
 ├── .env                       # API keys (not in repo)
 ├── search_results/            # Output files (not in repo)
 └── logs/                      # Run logs (not in repo)
@@ -169,6 +170,10 @@ To adapt this pipeline for a different role or industry:
 6. **`config.yaml` > `preferred_locations`** and **`location_verification`** — set your location preferences
 7. **`.env`** — add your own Anthropic API key
 8. Place your own CV (`.docx` format) in the project root and update the `cv_filename_pattern` in `config.yaml`
+
+## Documentation
+
+For a comprehensive guide covering installation, daily workflow, output file details, troubleshooting, and the scoring algorithm, see `Job_Scraper_User_Guide.docx`.
 
 ## Licence
 

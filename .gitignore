@@ -2,7 +2,7 @@
 .env
 
 # Personal documents (CVs, spreadsheets with personal data)
-*.docx
+CV - *.docx
 *.xlsx
 
 # Python virtual environment

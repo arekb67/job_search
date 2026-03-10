@@ -16,7 +16,7 @@ set -eo pipefail
 # ── Location ─────────────────────────────────────────────────────────────────
 # The directory where the job search pipeline lives.
 # Change this if you ever move the project to a different folder.
-PROJECT_DIR="/Users/arek/Documents/Claude_Code/job_search"
+PROJECT_DIR="/Users/arek/Documents/GitHub repos/job_search"
 
 # ── Prompt for version number ────────────────────────────────────────────────
 echo ""

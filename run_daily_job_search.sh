@@ -18,7 +18,7 @@
 
 set -eo pipefail
 
-SCRIPT_DIR="/Users/arek/Documents/Claude_Code/job_search"
+SCRIPT_DIR="/Users/arek/Documents/GitHub repos/job_search"
 VENV_DIR="$SCRIPT_DIR/venv"
 LOG_DIR="$SCRIPT_DIR/logs"
 DATE=$(date +%Y%m%d)

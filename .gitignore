@@ -1,6 +1,5 @@
 # Environment and secrets
 .env
-config.yaml
 
 # Personal documents (CVs, spreadsheets with personal data)
 *.docx

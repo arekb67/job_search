@@ -1,0 +1,859 @@
+# =============================================================================
+# Job Search Pipeline — Configuration File
+# =============================================================================
+# This file contains ALL user-configurable settings for both scripts:
+#   - job_scraper_2stage.py  (the web scraper)
+#   - phase2_scorer.py       (the Claude AI scorer)
+#
+# HOW TO EDIT:
+#   - Open this file in any text editor
+#   - Change values after the colon (:) on each line
+#   - Keep the indentation (spaces) exactly as shown
+#   - Lines starting with # are comments and are ignored
+#   - Save the file and re-run the scripts
+#
+# IMPORTANT:
+#   - Do NOT use tabs — only spaces for indentation
+#   - Strings with special characters should be in quotes
+#   - Lists use a dash (-) before each item
+# =============================================================================
+
+
+# =============================================================================
+# SCRAPER SETTINGS
+# =============================================================================
+# These control how the web scraper behaves when visiting company career pages.
+
+scraper_settings:
+  # Minimum score (0-100) for a job title to pass the Stage 1 quick scan.
+  # Lower = more results but less relevant. Higher = fewer but better matches.
+  min_score_threshold: 65
+
+  # Maximum characters of job description to store in output files.
+  description_max_chars: 3000
+
+  # How long to wait (seconds) for a web page to respond before giving up.
+  request_timeout: 15
+
+  # Pause (seconds) between visiting different company websites.
+  # This is polite crawling — don't set too low or sites may block you.
+  polite_delay: 2
+
+  # How many times to retry a failed web request before giving up.
+  max_retries: 2
+
+  # Pause (seconds) between retries.
+  retry_backoff: 3
+
+  # How many of the top-scoring jobs to fetch full descriptions for in Stage 2.
+  stage2_target_valid: 20
+
+  # How many candidate jobs to attempt in Stage 2 (some will fail to load).
+  # Set higher than stage2_target_valid to allow for failures.
+  stage2_candidate_pool: 50
+
+  # Browser identity string sent with web requests.
+  # Changing this is rarely needed — some sites block non-browser requests.
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+
+# =============================================================================
+# TARGET JOB TITLES & SCORING
+# =============================================================================
+# These are the job titles the scraper looks for on company career pages.
+# Each title has a score and a category.
+#
+# Score (0-100):
+#   100 = perfect match (e.g. your exact target role)
+#    85 = strong match (close to what you want)
+#    70 = acceptable (worth reviewing but not ideal)
+#
+# Category:
+#   "infrastructure" = product, platform, and infrastructure roles
+#   "sales"          = sales, business development, and account roles
+#
+# The category controls which company types search for this title.
+# See "company_type_categories" below for the mapping.
+#
+# To add a new title: copy an existing line and change the values.
+# To remove a title: delete the line or comment it out with #.
+# All titles are matched case-insensitively (lowercase is fine).
+
+target_job_titles:
+  # --- Perfect matches (score 100) ---
+  "platform owner":                {score: 100, category: "infrastructure"}
+  "platform product manager":      {score: 100, category: "infrastructure"}
+  "head of trading infrastructure": {score: 100, category: "infrastructure"}
+  "infrastructure director":       {score: 100, category: "infrastructure"}
+  "head of electronic trading":    {score: 100, category: "infrastructure"}
+  "director of global connectivity": {score: 100, category: "infrastructure"}
+  "head of market data":           {score: 100, category: "infrastructure"}
+
+  # --- Strong matches (score 95) ---
+  "head of product":               {score: 95, category: "infrastructure"}
+  "head of platform":              {score: 95, category: "infrastructure"}
+  "director of product":           {score: 95, category: "infrastructure"}
+  "director of platform":          {score: 95, category: "infrastructure"}
+  "head of infrastructure":        {score: 95, category: "infrastructure"}
+  "head of colocation":            {score: 95, category: "infrastructure"}
+
+  # --- Good matches (score 85) ---
+  "technical program manager":     {score: 85, category: "infrastructure"}
+  "technical programme manager":   {score: 85, category: "infrastructure"}
+  "tpm":                           {score: 85, category: "infrastructure"}
+  "senior product manager":        {score: 85, category: "infrastructure"}
+  "principal product manager":     {score: 85, category: "infrastructure"}
+  "technology product manager":    {score: 85, category: "infrastructure"}
+  "technical product manager":     {score: 85, category: "infrastructure"}
+
+  # --- Acceptable matches (score 80) ---
+  "solutions architect":           {score: 80, category: "infrastructure"}
+  "infrastructure product manager": {score: 80, category: "infrastructure"}
+  "colocation manager":            {score: 80, category: "infrastructure"}
+
+  # --- Worth reviewing (score 75) ---
+  "product manager":               {score: 75, category: "infrastructure"}
+  "platform manager":              {score: 75, category: "infrastructure"}
+  "delivery manager":              {score: 75, category: "infrastructure"}
+  "program manager":               {score: 75, category: "infrastructure"}
+  "programme manager":             {score: 75, category: "infrastructure"}
+  "engineering director":          {score: 75, category: "infrastructure"}
+
+  # --- Lower priority (score 70) ---
+  "engineering manager":           {score: 70, category: "infrastructure"}
+  "delivery lead":                 {score: 70, category: "infrastructure"}
+  "platform lead":                 {score: 70, category: "infrastructure"}
+
+  # --- Capital markets sales roles (score 80) ---
+  # These are only searched at FinTech and recruitment agency websites,
+  # NOT at hedge fund career pages (see company_type_categories below).
+  "product sales specialist":      {score: 80, category: "sales"}
+  "head of sales":                 {score: 80, category: "sales"}
+  "vp sales":                      {score: 80, category: "sales"}
+  "sales director":                {score: 80, category: "sales"}
+  "solutions consultant":          {score: 80, category: "sales"}
+  "pre-sales engineer":            {score: 80, category: "sales"}
+  "sales engineer":                {score: 80, category: "sales"}
+  "business development director": {score: 80, category: "sales"}
+  "business development manager":  {score: 80, category: "sales"}
+  "account executive":             {score: 80, category: "sales"}
+  "strategic account manager":     {score: 80, category: "sales"}
+  "client solutions manager":      {score: 80, category: "sales"}
+  "partnership manager":           {score: 80, category: "sales"}
+  "technical sales":               {score: 80, category: "sales"}
+  "solution sales":                {score: 80, category: "sales"}
+  # Broad catch-all terms (only active at FinTech/Recruitment via category filtering)
+  "sales":                         {score: 80, category: "sales"}
+  "product":                       {score: 80, category: "sales"}
+
+
+# =============================================================================
+# COMPANY TYPE → JOB CATEGORIES
+# =============================================================================
+# Controls which job title categories are searched at each company type.
+# Hedge funds only get infrastructure/product roles.
+# FinTech vendors and recruitment agencies get both infrastructure and sales.
+
+company_type_categories:
+  "Hedge Fund / Prop Trading":
+    - "infrastructure"
+  "FinTech":
+    - "infrastructure"
+    - "sales"
+  "Recruitment Agency":
+    - "infrastructure"
+    - "sales"
+
+
+# =============================================================================
+# EXCLUDED JOB TITLES
+# =============================================================================
+# Jobs containing ANY of these keywords in the title are automatically skipped.
+# These are typically individual contributor (IC) or unrelated roles.
+
+exclude_keywords:
+  - "software engineer"
+  - "platform engineer"
+  - "infrastructure engineer"
+  - "devops engineer"
+  - "site reliability engineer"
+  - "sre"
+  - "systems engineer"
+  - "network engineer"
+  - "data engineer"
+  - "machine learning engineer"
+  - "ml engineer"
+  - "frontend engineer"
+  - "backend engineer"
+  - "full stack engineer"
+  - "cloud engineer"
+  - "security engineer"
+  - "test engineer"
+  - "qa engineer"
+  - "data scientist"
+  - "research scientist"
+  - "applied scientist"
+  - "software developer"
+  - "developer"
+  - "quantitative developer"
+  - "analyst"
+  - "quantitative analyst"
+  - "business analyst"
+  - "data analyst"
+  - "quantitative researcher"
+  - "researcher"
+  - "trader"
+  - "intern"
+  - "graduate"
+
+
+# =============================================================================
+# PREFERRED LOCATIONS
+# =============================================================================
+# Jobs matching these location keywords pass the initial location filter.
+# Used when scanning career pages for relevant postings.
+
+preferred_locations:
+  - "london"
+  - "uk"
+  - "united kingdom"
+  - "remote"
+  - "hybrid"
+  - "europe"
+
+
+# =============================================================================
+# LOCATION VERIFICATION
+# =============================================================================
+# Stage 2 fetches full job descriptions and checks they are genuinely for
+# London or remote positions. This catches jobs listed as "London" on the
+# careers page but actually based in another city.
+
+location_verification:
+  # Keywords that confirm a job is based in London
+  london_keywords:
+    - "london"
+    - "london, uk"
+    - "london, united kingdom"
+    - "uk - london"
+    - "london office"
+
+  # Keywords that confirm a job allows remote or hybrid working
+  remote_keywords:
+    - "remote"
+    - "remote working"
+    - "work from home"
+    - "wfh"
+    - "remote-first"
+    - "fully remote"
+    - "hybrid"
+    - "hybrid working"
+    - "flexible location"
+    - "location flexible"
+
+  # Non-London cities and their common name variations.
+  # If a job description mentions one of these cities prominently,
+  # the job is rejected as being based outside London.
+  non_london_cities:
+    austin:
+      - "austin"
+      - "austin, texas"
+      - "austin, tx"
+    new york:
+      - "new york"
+      - "nyc"
+      - "new york city"
+      - "new york, ny"
+    chicago:
+      - "chicago"
+      - "chicago, il"
+      - "chicago, illinois"
+    san francisco:
+      - "san francisco"
+      - "sf"
+      - "bay area"
+      - "san francisco, ca"
+    singapore:
+      - "singapore"
+    hong kong:
+      - "hong kong"
+    sydney:
+      - "sydney"
+    tokyo:
+      - "tokyo"
+    amsterdam:
+      - "amsterdam"
+    paris:
+      - "paris"
+    frankfurt:
+      - "frankfurt"
+    zurich:
+      - "zurich"
+    mumbai:
+      - "mumbai"
+    shanghai:
+      - "shanghai"
+    dallas:
+      - "dallas"
+      - "dallas, tx"
+    houston:
+      - "houston"
+      - "houston, tx"
+    jersey city:
+      - "jersey city"
+      - "jersey city, nj"
+    tulsa:
+      - "tulsa"
+    gurugram:
+      - "gurugram"
+      - "gurgaon"
+    noida:
+      - "noida"
+    taipei:
+      - "taipei"
+
+
+# =============================================================================
+# DOMAIN VERIFICATION
+# =============================================================================
+# Stage 2 checks that job descriptions mention trading/infrastructure topics.
+# This prevents picking up unrelated roles (e.g. HR, marketing) that happen
+# to be at trading firms.
+
+domain_verification:
+  # At least ONE of these keywords must appear in the job description.
+  # Grouped by category for readability.
+  required_keywords:
+    # Trading platform keywords
+    - "trading platform"
+    - "trading infrastructure"
+    - "trading system"
+    - "trading technology"
+    - "execution platform"
+    - "order management"
+    - "oms"
+    - "execution management"
+    - "ems"
+    - "market data"
+    - "market connectivity"
+    - "exchange connectivity"
+    - "fix protocol"
+    - "algorithmic trading"
+    - "algo trading"
+    - "electronic trading"
+    - "equities trading"
+    - "derivatives trading"
+    - "forex trading"
+    - "crypto trading"
+    # Infrastructure keywords
+    - "platform infrastructure"
+    - "market infrastructure"
+    - "low latency"
+    - "high frequency"
+    - "hft"
+    - "ultra-low latency"
+    - "colocation"
+    - "co-location"
+    - "proximity hosting"
+    - "exchange hosting"
+    - "connectivity infrastructure"
+    - "network infrastructure"
+    - "market access"
+    # Platform product keywords
+    - "platform product"
+    - "infrastructure product"
+    - "trading product"
+    - "platform owner"
+    - "platform management"
+    - "platform engineering"
+    - "quant platform"
+    - "research platform"
+    - "quantitative infrastructure"
+    # Core trading tech
+    - "risk management system"
+    - "pricing engine"
+    - "trade lifecycle"
+    - "post-trade"
+    - "settlement system"
+    - "clearing"
+    - "portfolio management"
+    - "pms"
+    - "investment management system"
+
+  # Jobs containing these keywords are rejected (wrong domain entirely).
+  excluded_keywords:
+    - "customer support"
+    - "customer service"
+    - "client service"
+    - "marketing"
+    - "human resources"
+    - "hr technology"
+    - "talent acquisition"
+    - "recruitment"
+    - "finance system"
+    - "accounting software"
+    - "erp"
+    - "crm"
+    - "mobile app"
+    - "mobile application"
+    - "consumer app"
+    - "retail banking"
+    - "insurance tech"
+    - "insurtech"
+    - "wealth management app"
+    - "legal tech"
+    - "compliance software"
+
+
+# =============================================================================
+# SALARY DETECTION PATTERNS
+# =============================================================================
+# Used to detect whether a job shows USD salaries without GBP equivalents,
+# which often indicates a US-based role listed on a global careers page.
+# These are regular expression patterns — edit with care.
+
+salary_detection:
+  usd_pattern: '\$\d{2,3},\d{3}'
+  gbp_pattern: '\xa3\d{2,3},\d{3}'
+
+
+# =============================================================================
+# TARGET COMPANIES
+# =============================================================================
+# All companies whose career pages are scraped for job listings.
+# Each company needs at minimum a url and type.
+#
+# Fields:
+#   url:       Main careers page URL (required)
+#   alt_urls:  Alternative career URLs, e.g. Workday portals (optional)
+#   location:  Where the company has offices (for reference)
+#   type:      "Hedge Fund / Prop Trading", "FinTech", or "Recruitment Agency"
+#   note:      Any extra context, e.g. mergers or acquisitions (optional)
+#
+# To add a company:  copy an existing block and change the values.
+# To remove a company:  delete the entire block (name + all indented lines).
+
+target_companies:
+
+  # === TIER 1: HEDGE FUNDS & PROP TRADING ===
+
+  "Akuna Capital":
+    url: "https://akunacapital.com/careers"
+    location: "London / Chicago"
+    type: "Hedge Fund / Prop Trading"
+
+  "AQR Capital":
+    url: "https://careers.aqr.com/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Aspect Capital":
+    url: "https://www.aspectcapital.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Balyasny Asset Management":
+    url: "https://www.bamfunds.com/careers"
+    alt_urls:
+      - "https://bamfunds.wd1.myworkdayjobs.com/External"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "BlueCrest Capital":
+    url: "https://www.bluecrestcapital.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Brevan Howard":
+    url: "https://www.brevanhoward.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Capula Investment Management":
+    url: "https://www.capulaglobal.com/working-at-capula/careers/"
+    alt_urls:
+      - "https://apply.workable.com/capula-investment-management-ltd/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Citadel":
+    url: "https://www.citadel.com/careers/open-positions/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Citadel Securities":
+    url: "https://www.citadelsecurities.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "CQS":
+    url: "https://www.cqs.com/careers"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "DE Shaw":
+    url: "https://www.deshaw.com/careers"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "DRW Trading":
+    url: "https://drw.com/careers"
+    location: "London / Chicago"
+    type: "Hedge Fund / Prop Trading"
+
+  "Five Rings Capital":
+    url: "https://www.fiverings.com/careers"
+    location: "New York"
+    type: "Hedge Fund / Prop Trading"
+
+  "Flow Traders":
+    url: "https://www.flowtraders.com/careers"
+    location: "Amsterdam / London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Hudson River Trading":
+    url: "https://www.hudsonrivertrading.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "IMC Trading":
+    url: "https://careers.imc.com/us/en"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Jane Street":
+    url: "https://www.janestreet.com/join-jane-street/open-roles/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Jump Trading":
+    url: "https://www.jumptrading.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Lansdowne Partners":
+    url: "https://www.lansdownepartners.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Man Group":
+    url: "https://www.man.com/careers"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Marshall Wace":
+    url: "https://www.mwam.com/join-us/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Millennium Management":
+    url: "https://www.mlp.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Optiver":
+    url: "https://optiver.com/working-at-optiver/career-opportunities/"
+    location: "London / Chicago / Amsterdam"
+    type: "Hedge Fund / Prop Trading"
+
+  "Point72":
+    url: "https://careers.point72.com/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Renaissance Technologies":
+    url: "https://www.rentec.com/careers"
+    location: "New York"
+    type: "Hedge Fund / Prop Trading"
+
+  "Susquehanna (SIG)":
+    url: "https://careers.sig.com/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Systematica Investments":
+    url: "https://www.systematica.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Tower Research Capital":
+    url: "https://www.tower-research.com/careers"
+    location: "London / New York"
+    type: "Hedge Fund / Prop Trading"
+
+  "Two Sigma":
+    url: "https://careers.twosigma.com/careers/ExperiencedRoles"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Virtu Financial":
+    url: "https://www.virtu.com/careers"
+    location: "New York / London"
+    type: "Hedge Fund / Prop Trading"
+
+  "Winton Capital":
+    url: "https://www.winton.com/opportunities"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "WorldQuant":
+    url: "https://www.worldquant.com/careers/"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  "XTX Markets":
+    url: "https://www.xtxmarkets.com/careers"
+    location: "London"
+    type: "Hedge Fund / Prop Trading"
+
+  # === TIER 2: FINTECH & TRADING TECHNOLOGY ===
+
+  "SimCorp":
+    url: "https://www.simcorp.com/about-us/career/open-positions"
+    location: "London"
+    type: "FinTech"
+    note: "Includes Axioma (merged with SimCorp, Deutsche Borse Group)"
+
+  "Beacon Platform":
+    url: "https://beacon.io/careers/"
+    location: "London"
+    type: "FinTech"
+
+  "Beeks Group":
+    url: "https://careers.beeksgroup.com/jobs"
+    location: "Glasgow / London"
+    type: "FinTech"
+    note: "Formerly Beeks Financial Cloud"
+
+  "Bloomberg":
+    url: "https://www.bloomberg.com/company/careers/"
+    location: "London / New York"
+    type: "FinTech"
+
+  "BMLL Technologies":
+    url: "https://www.bmlltech.com/company/careers"
+    alt_urls:
+      - "https://apply.workable.com/bmlltech/"
+    location: "London"
+    type: "FinTech"
+
+  "Exegy":
+    url: "https://www.exegy.com/company/careers/"
+    location: "London / New York"
+    type: "FinTech"
+    note: "Includes Vela Trading (acquired by Exegy)"
+
+  "FactSet":
+    url: "https://www.factset.com/careers"
+    location: "London / New York"
+    type: "FinTech"
+
+  "ION Group":
+    url: "https://jobs.lever.co/ion"
+    location: "London"
+    type: "FinTech"
+    note: "Includes Fidessa (acquired by ION)"
+
+  "FinTech Studios":
+    url: "https://fintechstudios.com/careers/"
+    location: "London"
+    type: "FinTech"
+
+  "FlexTrade":
+    url: "https://flextrade.com/careers/"
+    location: "London"
+    type: "FinTech"
+
+  "LMAX Group":
+    url: "https://careers.lmax.com/"
+    location: "London"
+    type: "FinTech"
+
+  "OpenGamma":
+    url: "https://www.opengamma.com/careers/"
+    location: "London"
+    type: "FinTech"
+
+  "Options IT":
+    url: "https://www.options-it.com/careers/"
+    location: "London"
+    type: "FinTech"
+
+  "Pico Quantitative":
+    url: "https://www.pico.net/careers/"
+    location: "London"
+    type: "FinTech"
+
+  "QuantHouse (Iress)":
+    url: "https://www.iress.com/join-us/careers/"
+    location: "London / Paris"
+    type: "FinTech"
+    note: "QuantHouse acquired by Iress"
+
+  "Refinitiv (LSEG)":
+    url: "https://www.lseg.com/careers"
+    location: "London"
+    type: "FinTech"
+
+  "SmartStream Technologies":
+    url: "https://www.smartstream-stp.com/careers/"
+    location: "London"
+    type: "FinTech"
+
+  "SS&C Technologies":
+    url: "https://www.ssctech.com/careers"
+    location: "London"
+    type: "FinTech"
+
+  "Talos":
+    url: "https://www.talos.com/careers/"
+    location: "London"
+    type: "FinTech"
+
+  "Trading Technologies":
+    url: "https://www.tradingtechnologies.com/careers/"
+    location: "London"
+    type: "FinTech"
+
+  "TS Imagine":
+    url: "https://tsimagine.com/careers-2/"
+    alt_urls:
+      - "https://tsimagine.hire.trakstar.com/"
+    location: "London"
+    type: "FinTech"
+
+  # === TIER 3: RECRUITMENT AGENCIES ===
+
+  "Selby Jennings":
+    url: "https://www.selbyjennings.com/en-gb/jobs/ls-london"
+    location: "London"
+    type: "Recruitment Agency"
+    note: "Agency - lists roles at hedge funds/FinTech (anonymised clients)"
+
+  "H.W. Anderson":
+    url: "https://www.hw-anderson.com/"
+    location: "London / Edinburgh"
+    type: "Recruitment Agency"
+    note: "Executive search - buy-side hedge fund/commodities talent"
+
+
+# =============================================================================
+# SCORER SETTINGS (used by phase2_scorer.py)
+# =============================================================================
+# These control how the Claude AI scores jobs against your CV.
+
+scorer_settings:
+  # Filename pattern for your CV. The script finds the most recent file
+  # matching this pattern by looking for a YYYYMMDD date in the filename.
+  # Example: "CV - Arek Baranowski 20260303.docx" matches this pattern.
+  cv_filename_pattern: "CV - Arek Baranowski*.docx"
+
+  # Your years of professional experience (used in the scoring prompt)
+  years_of_experience: 20
+
+  # Which Claude model to use for scoring.
+  # "claude-sonnet-4-20250514" is recommended (good balance of speed and quality).
+  claude_model: "claude-sonnet-4-20250514"
+
+  # Maximum tokens (words) Claude can use in its scoring response.
+  max_tokens: 2000
+
+  # How many times to retry if a Claude API call fails.
+  api_retry_attempts: 3
+
+  # Pause (seconds) between retries after an API error.
+  api_retry_delay: 5
+
+  # Pause (seconds) between each job scoring call.
+  # Prevents hitting API rate limits.
+  api_rate_limit_pause: 1
+
+  # Maximum characters of job description sent to Claude for scoring.
+  # Longer descriptions are truncated to save API costs.
+  job_description_max_chars: 4000
+
+
+# =============================================================================
+# CANDIDATE PROFILE
+# =============================================================================
+# Your target roles and technical skills. These are included in the prompt
+# sent to Claude so it knows what kind of roles you're looking for and
+# what skills to match against.
+
+candidate_profile:
+  # Job titles you're targeting (Claude uses these to assess role fit)
+  target_roles:
+    - "Product Manager"
+    - "Platform Owner"
+    - "Technical Program Manager"
+    - "Head of Infrastructure"
+    - "Head of Platform"
+    - "Director of Product"
+    - "Solutions Architect"
+
+  # Your core technical skills (Claude checks job requirements against these)
+  technical_skills:
+    - "trading infrastructure"
+    - "low-latency"
+    - "colocation"
+    - "exchange connectivity"
+    - "market data"
+    - "FIX protocol"
+    - "platform ownership"
+    - "architecture"
+    - "multi-asset electronic execution"
+    - "messaging infrastructure"
+
+
+# =============================================================================
+# INDUSTRY CLASSIFICATION
+# =============================================================================
+# How Claude scores companies based on their industry. Tier 1 companies
+# (hedge funds, prop trading) score highest.
+
+industry_tiers:
+  tier1:
+    description: "hedge funds, prop trading, market makers"
+    score_range: "90-100"
+  tier2:
+    description: "FinTech, trading technology, capital markets"
+    score_range: "75-89"
+  tier3:
+    description: "broader financial services"
+    score_range: "50-74"
+
+
+# =============================================================================
+# LOCATION SCORING PREFERENCES (for Claude AI scorer)
+# =============================================================================
+# How Claude scores jobs based on their location.
+# Edit the score ranges if your location preferences change.
+
+location_scores:
+  "London UK office": "95-100"
+  "London + hybrid/remote": "100"
+  "Fully remote": "85-90"
+  "Other UK": "60-70"
+  "Europe": "40-50"
+  "US or other": "10-20"
+
+
+# =============================================================================
+# RECOMMENDATION THRESHOLDS & COLOURS
+# =============================================================================
+# How the overall score (average of 5 dimensions) maps to a recommendation.
+# Adjust these numbers to be more or less selective.
+
+recommendations:
+  thresholds:
+    apply_immediately: 80    # Score 80+ = Apply Immediately
+    strong_consider: 65      # Score 65-79 = Strong Consider
+    consider: 50             # Score 50-64 = Consider
+    # Below 50 = Skip
+
+  # Colours for each recommendation level in the Excel output (hex RGB codes)
+  colours:
+    "Apply Immediately": "C6EFCE"    # Green
+    "Strong Consider": "DDEBF7"      # Light blue
+    "Consider": "FFF2CC"             # Yellow
+    "Skip": "F2DCDB"                 # Light red

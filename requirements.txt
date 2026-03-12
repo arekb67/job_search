@@ -6,3 +6,4 @@ anthropic
 PyYAML
 python-dotenv
 python-docx
+playwright

@@ -8,8 +8,8 @@ Built for job seekers targeting specific roles in specific industries — curren
 
 ### Phase 1 — Web Scraper (`job_scraper_2stage.py`)
 
-1. **Stage 1 (Quick Scan):** Visits career pages for all target companies and extracts job titles. Each title is scored against your target roles using keyword matching.
-2. **Stage 2 (Deep Validation):** Fetches full job descriptions for the top candidates and validates them against location (e.g. London/Remote only) and domain (e.g. trading infrastructure only). Rejects jobs that don't match.
+1. **Stage 1 (Quick Scan):** Visits career pages for all target companies and extracts job titles. Companies using supported ATS platforms (e.g. BambooHR) are scraped via their JSON APIs for more reliable results. Each title is scored against your target roles using keyword matching.
+2. **Stage 2 (Deep Validation):** Fetches full job descriptions for the top candidates and validates them against location (e.g. London/Remote only) and domain (e.g. trading infrastructure only). Rejects jobs that don't match. Pages that require JavaScript rendering are automatically retried using a headless Chromium browser (Playwright).
 
 **Output files** (saved to `search_results/` with date suffix):
 - `pass1_quick_results-YYYYMMDD.xlsx` — all jobs found, with title-based scores
@@ -38,6 +38,7 @@ Each job gets an overall score and a recommendation: **Apply Immediately**, **St
 
 - **Python 3.10+**
 - **Anthropic API key** (for Phase 2 CV scoring) — get one at [console.anthropic.com](https://console.anthropic.com/)
+- **Playwright + Chromium** (optional, for JS-rendered career pages) — installed automatically with dependencies
 
 ## Setup
 
@@ -59,6 +60,7 @@ source venv/bin/activate
 
 ```bash
 pip install -r requirements.txt
+playwright install chromium
 ```
 
 ### 4. Create a `.env` file
@@ -78,13 +80,14 @@ Place your CV as a `.docx` file in the project root. The filename should match t
 Edit `config.yaml` to configure:
 
 - **Target job titles** and their relevance scores
-- **Target companies** and their career page URLs
+- **Target companies** and their career page URLs (with optional `platform` field for ATS-specific handlers)
 - **Excluded job titles** (e.g. software engineer, data scientist)
 - **Preferred locations** and location verification rules
 - **Domain verification keywords** (to filter out irrelevant roles)
 - **Scoring thresholds** for recommendations
 - **Candidate profile** (your target roles and technical skills)
 - **Claude model** and API settings
+- **Playwright fallback** toggle for JS-rendered pages
 
 The file is heavily commented — each section explains what it does and how to edit it.
 
@@ -138,7 +141,7 @@ The project includes macOS `launchd` scripts to run the pipeline automatically o
 
 ```
 job_search/
-├── job_scraper_2stage.py      # Phase 1: web scraper
+├── job_scraper_2stage.py      # Phase 1: web scraper (with BambooHR API + Playwright fallback)
 ├── phase2_scorer.py           # Phase 2: Claude API CV scorer
 ├── config_loader.py           # Shared config loader
 ├── config.yaml                # All user-configurable settings

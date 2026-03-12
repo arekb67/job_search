@@ -56,6 +56,11 @@ scraper_settings:
   # Changing this is rarely needed — some sites block non-browser requests.
   user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
+  # Use headless Chromium (via Playwright) as a fallback when standard HTTP
+  # requests fail or return empty/JS-rendered pages. Requires: pip install
+  # playwright && playwright install chromium
+  playwright_fallback: true
+
 
 # =============================================================================
 # TARGET JOB TITLES & SCORING
@@ -676,6 +681,8 @@ target_companies:
 
   "Options IT":
     url: "https://www.options-it.com/careers/"
+    platform: "bamboohr"
+    bamboohr_subdomain: "optionsit"
     location: "London"
     type: "FinTech"
 

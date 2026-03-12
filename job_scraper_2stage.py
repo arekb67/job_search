@@ -85,6 +85,9 @@ EXCLUDED_DOMAIN_KEYWORDS = config['domain_verification']['excluded_keywords']
 USD_SALARY_PATTERN = config['salary_detection']['usd_pattern']
 GBP_SALARY_PATTERN = config['salary_detection']['gbp_pattern']
 
+# Playwright fallback for JS-rendered pages (requires: pip install playwright)
+PLAYWRIGHT_FALLBACK = config['scraper_settings'].get('playwright_fallback', False)
+
 # Target companies (loaded from config.yaml)
 COMPANIES = config['target_companies']
 
@@ -129,6 +132,76 @@ def request_with_retry(method, url, **kwargs):
                 break
 
     return None, last_exception
+
+# ============================================================================
+# HELPER: PLAYWRIGHT FALLBACK FOR JS-RENDERED PAGES
+# ============================================================================
+
+def fetch_page_with_playwright(url, wait_seconds=3):
+    """Fallback: fetch a page using headless Chromium for JS-rendered content.
+    Only called when PLAYWRIGHT_FALLBACK is enabled and standard requests fail
+    or return suspiciously empty content.
+    Returns (html_string, None) on success, or (None, exception) on failure."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return None, ImportError(
+            "playwright not installed — run: pip install playwright && playwright install chromium"
+        )
+
+    try:
+        with sync_playwright() as p:
+            # Use full Chromium (not headless shell) for better compatibility
+            browser = p.chromium.launch(
+                headless=True,
+                channel="chromium",
+            )
+            page = browser.new_page(user_agent=USER_AGENT)
+            # Longer timeout than requests — Chromium needs time to launch + render
+            page.goto(url, timeout=30000, wait_until="networkidle")
+            page.wait_for_timeout(wait_seconds * 1000)
+            html = page.content()
+            browser.close()
+            return html, None
+    except Exception as e:
+        return None, e
+
+
+def _html_looks_empty(html_text):
+    """Heuristic check: does this HTML have too little visible text content?
+    Returns True if the page is likely a JS shell that hasn't rendered."""
+    soup = BeautifulSoup(html_text, 'html.parser')
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+    visible_text = soup.get_text(strip=True)
+    return len(visible_text) < 200
+
+
+def fetch_with_fallback(url):
+    """Fetch a URL with requests first, falling back to Playwright if needed.
+    Returns (html_string, exception). If successful, exception is None."""
+    response, exc = request_with_retry('GET', url)
+
+    if exc is None:
+        html_text = response.text
+        # Check if the page rendered properly (not a JS shell)
+        if PLAYWRIGHT_FALLBACK and _html_looks_empty(html_text):
+            print("(JS shell, trying Playwright)...", end=" ")
+            pw_html, pw_exc = fetch_page_with_playwright(url)
+            if pw_exc is None:
+                return pw_html, None
+            # Playwright also failed — return the original (thin) HTML
+        return html_text, None
+
+    # Requests failed entirely — try Playwright
+    if PLAYWRIGHT_FALLBACK:
+        print("(trying Playwright)...", end=" ")
+        pw_html, pw_exc = fetch_page_with_playwright(url)
+        if pw_exc is None:
+            return pw_html, None
+
+    return None, exc
+
 
 # ============================================================================
 # STAGE 1: QUICK SCORING
@@ -248,6 +321,97 @@ def classify_error(exception, response=None):
     return diag
 
 
+def scrape_bamboohr_jobs(company_name, company_data):
+    """Scrape job listings via BambooHR's JSON API instead of HTML parsing.
+    Companies with platform: 'bamboohr' in config use this path.
+    Returns (jobs_list, error_dict_or_None) — same contract as scrape_company_jobs()."""
+    subdomain = company_data['bamboohr_subdomain']
+    list_url = f"https://{subdomain}.bamboohr.com/careers/list"
+
+    print(f"  {company_name} (BambooHR API)...", end=" ")
+
+    response, exc = request_with_retry('GET', list_url)
+    if exc is not None:
+        diag = classify_error(exc, None)
+        print(f"FAIL {diag['classification']}")
+        return [], {
+            'company': company_name,
+            'url': list_url,
+            'type': company_data.get('type', ''),
+            'error_classification': diag['classification'],
+            'http_status': diag['http_status'],
+            'status_reason': diag['status_reason'],
+            'server_header': diag['server_header'],
+            'error_type': diag['error_type'],
+            'error_detail': diag['detail'],
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'source': 'BambooHR API',
+        }
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        print("FAIL (invalid JSON)")
+        return [], {
+            'company': company_name,
+            'url': list_url,
+            'type': company_data.get('type', ''),
+            'error_classification': 'Invalid JSON Response',
+            'http_status': response.status_code,
+            'status_reason': response.reason,
+            'server_header': response.headers.get('Server', 'N/A'),
+            'error_type': 'ValueError',
+            'error_detail': str(e)[:200],
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'source': 'BambooHR API',
+        }
+
+    job_list = data.get('result', [])
+
+    jobs = []
+    seen_jobs = set()
+    for item in job_list:
+        title = item.get('jobOpeningName', '')
+        job_id = item.get('id', '')
+        loc = item.get('location', {})
+        # BambooHR gives structured location — combine city + country
+        location_str = loc.get('city', '') or ''
+        country = loc.get('addressCountry', '')
+        if country:
+            location_str = f"{location_str}, {country}" if location_str else country
+
+        # Build the detail URL for Stage 2 description fetching
+        detail_url = f"https://{subdomain}.bamboohr.com/careers/{job_id}/detail"
+
+        # Apply same scoring/filtering as the HTML scraper
+        score = quick_score(
+            title,
+            location_str or company_data.get('location', ''),
+            company_name,
+            company_data.get('type', ''),
+        )
+        if score < MIN_SCORE_THRESHOLD:
+            continue
+
+        job_key = f"{title}_{detail_url}"
+        if job_key in seen_jobs:
+            continue
+        seen_jobs.add(job_key)
+
+        jobs.append({
+            'company': company_name,
+            'title': title,
+            'url': detail_url,
+            'location': location_str or company_data.get('location', ''),
+            'type': company_data.get('type', ''),
+            'source': 'BambooHR API',
+        })
+
+    print(f"OK {len(jobs)} jobs (from {len(job_list)} total listings)")
+    time.sleep(POLITE_DELAY)
+    return jobs, None
+
+
 def scrape_company_jobs(company_name, company_data):
     """Scrape job titles from company career page. Tries alt_urls if primary fails."""
     print(f"  {company_name}...", end=" ")
@@ -263,7 +427,7 @@ def scrape_company_jobs(company_name, company_data):
     for attempt_url in urls_to_try:
         jobs = []
 
-        response, exc = request_with_retry('GET', attempt_url)
+        html_text, exc = fetch_with_fallback(attempt_url)
 
         if exc is not None:
             last_exception = exc
@@ -272,7 +436,7 @@ def scrape_company_jobs(company_name, company_data):
                 continue
             break
 
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(html_text, 'html.parser')
         job_links = soup.find_all('a', href=True)
 
         seen_jobs = set()
@@ -344,18 +508,41 @@ def verify_job_location_and_domain(url):
     Returns: (description_text, is_valid, reason)
     """
     try:
-        response, exc = request_with_retry('GET', url)
-        if exc is not None:
-            return f"Error fetching description: {str(exc)[:100]}", False, "Error fetching"
+        # BambooHR detail URLs return JSON with an HTML description field
+        is_bamboohr = 'bamboohr.com/careers/' in url and url.endswith('/detail')
 
-        soup = BeautifulSoup(response.text, 'html.parser')
+        if is_bamboohr:
+            response, exc = request_with_retry('GET', url)
+            if exc is not None:
+                return f"Error fetching description: {str(exc)[:100]}", False, "Error fetching"
+            try:
+                data = response.json()
+                job_data = data.get('result', {}).get('jobOpening', {})
+                description_html = job_data.get('description', '')
+                # Include structured fields the JSON gives us for free
+                loc = job_data.get('location', {})
+                location_line = ', '.join(
+                    v for v in [loc.get('city'), loc.get('state'), loc.get('addressCountry')] if v
+                )
+                header = f"{job_data.get('jobOpeningName', '')}\nLocation: {location_line}\n"
+                soup = BeautifulSoup(description_html, 'html.parser')
+                full_text = header + soup.get_text()
+            except (ValueError, AttributeError):
+                return "Error parsing BambooHR JSON response", False, "Error fetching"
+        else:
+            # Standard HTML page — use fetch_with_fallback (includes Playwright)
+            html_text, exc = fetch_with_fallback(url)
+            if exc is not None:
+                return f"Error fetching description: {str(exc)[:100]}", False, "Error fetching"
 
-        # Remove script and style elements
-        for script in soup(["script", "style", "nav", "header", "footer"]):
-            script.decompose()
+            soup = BeautifulSoup(html_text, 'html.parser')
 
-        # Get full text
-        full_text = soup.get_text()
+            # Remove script and style elements
+            for script in soup(["script", "style", "nav", "header", "footer"]):
+                script.decompose()
+
+            # Get full text
+            full_text = soup.get_text()
 
         # Clean up whitespace
         lines = (line.strip() for line in full_text.splitlines())
@@ -563,7 +750,11 @@ def main():
     # Scrape company websites
     print(f"\nScraping {len(COMPANIES)} companies:")
     for company_name, company_data in COMPANIES.items():
-        jobs, error = scrape_company_jobs(company_name, company_data)
+        # Route to platform-specific scraper if configured, else default HTML scraper
+        if company_data.get('platform') == 'bamboohr':
+            jobs, error = scrape_bamboohr_jobs(company_name, company_data)
+        else:
+            jobs, error = scrape_company_jobs(company_name, company_data)
         all_jobs.extend(jobs)
         if error:
             failed_companies.append(error)

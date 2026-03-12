@@ -51,7 +51,7 @@ if [ "$RUN_PHASE1" = true ]; then
     echo "PHASE 1: Running job scraper..." | tee -a "$LOG_FILE"
     echo "------------------------------------------------------------" | tee -a "$LOG_FILE"
 
-    if python3 "$SCRIPT_DIR/job_scraper_2stage.py" 2>&1 | tee -a "$LOG_FILE"; then
+    if "$VENV_DIR/bin/python" "$SCRIPT_DIR/job_scraper_2stage.py" 2>&1 | tee -a "$LOG_FILE"; then
         echo "" | tee -a "$LOG_FILE"
         echo "Phase 1 completed successfully." | tee -a "$LOG_FILE"
     else
@@ -67,7 +67,7 @@ if [ "$RUN_PHASE2" = true ]; then
     echo "PHASE 2: Running CV matching scorer..." | tee -a "$LOG_FILE"
     echo "------------------------------------------------------------" | tee -a "$LOG_FILE"
 
-    if python3 "$SCRIPT_DIR/phase2_scorer.py" --date "$DATE" 2>&1 | tee -a "$LOG_FILE"; then
+    if "$VENV_DIR/bin/python" "$SCRIPT_DIR/phase2_scorer.py" --date "$DATE" 2>&1 | tee -a "$LOG_FILE"; then
         echo "" | tee -a "$LOG_FILE"
         echo "Phase 2 completed successfully." | tee -a "$LOG_FILE"
     else
